@@ -171,9 +171,18 @@ EVOLVER_MODEL=z-ai/glm-5.2 uv run --with openai python \
 # Winner: /tmp/evolve_rag/best_instruction.txt
 ```
 
+## Engram Health Check (correct endpoint — do NOT guess)
+
+`GET https://api.engram.weaviate.io/health` → 200 + `{"status":"healthy","service":"engram-memory-server"}`. Auth via `Authorization: Bearer $ENGRAM_API_KEY` (optional for /health but harmless).
+
+**Do NOT probe `/v1/health`, `/healthz`, `/v1/ready`, or `/v1/` — those return 404 and look like the service is down when it isn't.** The base path is `/health` (no `/v1/` prefix). This bit the 2026-07-22 audit: a wrong-path 404 got reported as a failure when Engram was healthy the whole time.
+
+For the real round-trip verification, use the Python client (`memories.search(...)`), NOT a hand-crafted curl POST to `/v1/memories/search` — the request schema (especially `retrieval_config`) is strict and a malformed body returns 422, which looks like an API failure but is just a bad payload. The client builds the correct schema. A successful `memories.search()` returning results (or an empty-but-200 result set) is the proof Engram is alive and authed.
+
 ## Verification
 
 - [ ] `ENGRAM_API_KEY` in all .env files (deduped, latest only)
+- [ ] Engram health: `GET https://api.engram.weaviate.io/health` → 200 healthy (NOT /v1/health)
 - [ ] `memories.add()` returns a `run_id` (real API call, not dry run)
 - [ ] `memories.search()` returns Memory objects with `.content/.id/.score` (Sequence, not dict)
 - [ ] `runs.wait(run_id)` succeeds OR non-fatal on timeout
