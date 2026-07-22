@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+
+# Caches / state
+*.db
+*.db-journal
+~/.hermes/cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Darwinian evolver snapshots
+/tmp/evolve_*/
+snapshots/*.pkl

@@ -1,0 +1,18 @@
+services:
+  camofox-browser:
+    image: ghcr.io/redf0x1/camofox-browser:latest
+    container_name: camofox-browser
+    restart: unless-stopped
+    ports:
+      - "9377:9377"
+      - "6080:6080"
+    environment:
+      CAMOFOX_HOST: "0.0.0.0"
+      CAMOFOX_PORT: "9377"
+      CAMOFOX_AUTH_MODE: "auto"
+      CAMOFOX_API_KEY: "change-me"
+      ENABLE_VNC: "1"
+      VNC_BIND: "0.0.0.0"
+      VNC_RESOLUTION: "1920x1080"
+    volumes:
+      - ~/.camofox-docker:/home/node/.camofox
