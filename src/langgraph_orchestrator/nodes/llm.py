@@ -53,23 +53,41 @@ def llm_chat_gemini_direct(system: str, user: str, model: str, temperature: floa
 
     One hop: orchestrator -> generativelanguage.googleapis.com -> Gemini.
     Uses GEMINI_API_KEY (billing-verified). Cuts the 3-hop chain to 1.
+
+    Safety filters DISABLED: all 4 adjustable harm categories set to BLOCK_NONE
+    so the model actually listens instead of stiffing on normal prompts. The 4
+    non-adjustable built-in protections (child safety etc.) remain — Google
+    blocks those server-side regardless and returns PROHIBITED_CONTENT.
     """
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not set for direct Gemini path")
-    # Gemini generateContent API
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     payload = {
         "system_instruction": {"parts": [{"text": system}]},
         "contents": [{"role": "user", "parts": [{"text": user}]}],
         "generationConfig": {"temperature": temperature},
+        # Disable all 4 adjustable safety filters (BLOCK_NONE).
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ],
     }
     with httpx.Client(timeout=90.0) as client:
         resp = client.post(url, json=payload, headers={"Content-Type": "application/json"})
     if resp.status_code >= 400:
         raise RuntimeError(f"Gemini direct HTTP {resp.status_code}: {resp.text[:300]}")
     data = resp.json()
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    # Surface safety blocks explicitly so they don't look like empty content
+    if "candidates" not in data or not data["candidates"]:
+        block = data.get("promptFeedback", {}).get("blockReason", "UNKNOWN")
+        raise RuntimeError(f"Gemini blocked (reason={block})")
+    cand = data["candidates"][0]
+    if cand.get("finishReason") == "SAFETY":
+        raise RuntimeError("Gemini output blocked by safety filter")
+    return cand["content"]["parts"][0]["text"]
 
 
 def llm_json(system: str, user: str, model: str | None = None) -> dict:
