@@ -6,7 +6,7 @@ and graceful degradation on partial results.
 from __future__ import annotations
 
 import structlog
-from .llm import llm_chat
+from .llm import llm_chat, llm_chat_gemini_direct
 from .models import resolve
 from ..state import OrchestratorState
 from ..config import settings
@@ -67,7 +67,13 @@ Scraped content ({len(raw)} chars):
 
 Produce a grounded answer to the user query based on this content."""
         try:
-            summary = llm_chat(SUMMARY_SYSTEM, user_msg, model=model)
+            # Direct Google Gemini — 1 hop (cuts Blackbox + Vercel from the chain).
+            # Falls back to Blackbox glm-5.2 if the direct path errors.
+            try:
+                summary = llm_chat_gemini_direct(SUMMARY_SYSTEM, user_msg, model=model)
+            except Exception as direct_err:
+                log.warn("summary.direct_gemini_failed", error=str(direct_err)[:100], fallback="blackbox")
+                summary = llm_chat(SUMMARY_SYSTEM, user_msg, model=resolve("fallback"))
         except Exception as e:
             log.error("summary.llm_failed", error=str(e)[:120])
             # Graceful: return raw content if LLM fails
