@@ -120,13 +120,17 @@ State fields: `rag_context: str`, `rag_memories: list`, `vectorized_chunks: int`
 
 Every graph node reads its model from `resolve("<task>")` — no node inherits a generic default. Edit `nodes/models.py` to swap; re-verify a new model serves with a 1-token completion before committing.
 
-| Task | Model | Provider | Why | Servable? |
+| Task | Model | Transport | Why | Servable? |
 |---|---|---|---|---|
-| plan (JSON routing) | `blackboxai/deepseek/deepseek-v4-pro` | Blackbox | Strong reasoning + JSON discipline. Best servable reasoner — Anthropic/GPT-5 routes were Vertex-down at selection time. | ✓ verified |
-| summary (synthesis) | `blackboxai/google/gemini-3.5-flash` | Blackbox | 1M-context, fast, cheap, strong grounded synthesis over scraped content + memory. | ✓ verified |
+| plan (JSON routing) | `blackboxai/deepseek/deepseek-v4-pro` | Blackbox (api.blackbox.ai) | Strong reasoning + JSON discipline. Best servable reasoner. | ✓ verified |
+| summary (synthesis) | `gemini-3-flash-preview` | **DIRECT Google** (generativelanguage.googleapis.com) | 1M-context synthesis. Routed direct to cut the Blackbox+Vercel hops (was 3 hops, now 1). GEMINI_API_KEY billing-verified. Falls back to Blackbox glm-5.2 on error. | ✓ verified |
 | venice (private scrape) | `llama-3.3-70b` | Venice (direct) | Proven Venice scraper with `enable_web_scraping`. Private inference. | ✓ verified |
 | embedding | `Snowflake/snowflake-arctic-embed-l-v2.0` | Weaviate (text2vec-weaviate) | Multilingual 8192-tok, no external key, private to WCD. Locked. | ✓ verified |
-| fallback | `z-ai/glm-5.2` | Blackbox | Cheap, always-on. Used when a primary is rate-limited. | ✓ verified |
+| fallback | `z-ai/glm-5.2` | Blackbox | Cheap, always-on. Summary falls back here if direct Gemini errors. | ✓ verified |
+
+**Two LLM transport paths** (`nodes/llm.py`): `llm_chat()` → Blackbox; `llm_chat_gemini_direct()` → Google direct (native `generateContent` API, `system_instruction`+`contents` schema). Summary uses the direct path; plan/fallback use Blackbox.
+
+**Why summary goes direct (no-failures optimization):** Blackbox routes `blackboxai/google/gemini-*` through Vercel AI Gateway (`x-litellm-model-api-base: https://ai-gateway.vercel.sh/v1`), so the old chain was orchestrator→Blackbox→Vercel→Gemini = 3 hops, 3 failure points. Direct Google is 1 hop. The no-failures rule means eliminate failure points by optimizing — not "don't touch working code." If the direct path errors, summary falls back to Blackbox glm-5.2 (resilient, not single-point).
 
 **Servability gotcha (2026-07-22):** Blackbox routes Anthropic (claude-sonnet/opus/fable) and GPT-5.x through Vertex AI, which was returning `Vertex_aiException InternalServerError` for all of them. DeepSeek, Kimi-k2.7-code, Gemini 3.5 Flash, Gemini 3.1 Flash Lite, and glm-5.2 all served fine. Always test a 1-token completion against `/v1/chat/completions` before pinning a model — the `/models` listing shows availability, not live servability.
 
