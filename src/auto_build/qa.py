@@ -131,7 +131,7 @@ class QAChecker:
                 err = self._check_json_syntax(path, content)
                 if err:
                     errors.append(err)
-            elif path.endswith(".js", ".ts", ".tsx", ".jsx"):
+            elif path.endswith((".js", ".ts", ".tsx", ".jsx")):
                 err = self._check_js_syntax(path, content)
                 if err:
                     errors.append(err)
@@ -174,7 +174,13 @@ class QAChecker:
             return f"{path}: JSON syntax error: {e}"
 
     def _check_js_syntax(self, path: str, content: str) -> str | None:
-        """Check JS/TS syntax using node --check."""
+        """Check JS syntax using node --check.
+
+        TypeScript (.ts/.tsx) files are skipped — they need tsc, not node.
+        """
+        # Skip TypeScript — node can't parse TS syntax
+        if path.endswith((".ts", ".tsx")):
+            return None
         try:
             suffix = ".mjs" if path.endswith((".ts", ".tsx")) else ".js"
             import tempfile

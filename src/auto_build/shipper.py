@@ -78,25 +78,40 @@ class Shipper:
         # Build the PR body from plan + QA results
         pr_body = self._build_pr_body(state)
 
-        # Create the PR
-        logger.info("Shipper: creating PR '%s' on %s/%s", plan.pr_title, owner, repo)
-        pr = self.git_ops.create_pr(
-            owner=owner,
-            repo=repo,
-            title=plan.pr_title,
-            head=plan.branch_name,
-            base="main",
-            body=pr_body,
-        )
+        # Check if a PR already exists for this branch
+        existing_prs = self.github.list_prs(owner, repo, state="open")
+        existing = None
+        for p in existing_prs:
+            if p.head_ref == plan.branch_name:
+                existing = p
+                break
 
-        result = ShipResult(
-            pr_number=pr.number,
-            pr_url=pr.url,
-            branch_name=plan.branch_name,
-            commit_sha=state.commit_sha,
-        )
-
-        logger.info("Shipper: PR created #%d — %s", pr.number, pr.url)
+        if existing:
+            logger.info("Shipper: PR #%d already exists for %s — reusing", existing.number, plan.branch_name)
+            result = ShipResult(
+                pr_number=existing.number,
+                pr_url=existing.html_url,
+                branch_name=plan.branch_name,
+                commit_sha=state.commit_sha,
+            )
+        else:
+            # Create the PR
+            logger.info("Shipper: creating PR '%s' on %s/%s", plan.pr_title, owner, repo)
+            pr = self.git_ops.create_pr(
+                owner=owner,
+                repo=repo,
+                title=plan.pr_title,
+                head=plan.branch_name,
+                base="main",
+                body=pr_body,
+            )
+            result = ShipResult(
+                pr_number=pr.number,
+                pr_url=pr.url,
+                branch_name=plan.branch_name,
+                commit_sha=state.commit_sha,
+            )
+            logger.info("Shipper: PR created #%d — %s", pr.number, pr.url)
 
         # Wait for CI and merge
         if self.wait_for_ci:
@@ -104,7 +119,7 @@ class Shipper:
             merge_result = self.git_ops.merge_pr_on_green(
                 owner=owner,
                 repo=repo,
-                number=pr.number,
+                number=result.pr_number,
                 method=self.merge_method,
                 max_wait=self.ci_timeout,
             )
@@ -112,7 +127,7 @@ class Shipper:
             result.merge_message = merge_result.message
 
             if merge_result.merged:
-                logger.info("Shipper: ✅ PR #%d merged!", pr.number)
+                logger.info("Shipper: ✅ PR #%d merged!", result.pr_number)
                 # Clean up the feature branch
                 self.git_ops.delete_feature_branch(owner, repo, plan.branch_name)
             else:

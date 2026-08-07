@@ -203,9 +203,35 @@ class Orchestrator:
             run_id, state.current_phase, state.status,
         )
 
-        if state.status in (PipelineStatus.COMPLETED, PipelineStatus.FAILED, PipelineStatus.CANCELLED):
-            logger.info("Orchestrator: run already %s — nothing to resume", state.status)
+        if state.status == PipelineStatus.COMPLETED:
+            logger.info("Orchestrator: run already COMPLETED — nothing to resume")
             return state
+
+        if state.status == PipelineStatus.CANCELLED:
+            logger.info("Orchestrator: run was CANCELLED — nothing to resume")
+            return state
+
+        # FAILED runs can be resumed — reset status to PENDING so the
+        # pipeline picks up from the last completed phase
+        if state.status == PipelineStatus.FAILED:
+            logger.info("Orchestrator: resuming FAILED run — retrying from last completed phase")
+            # Determine which phase to resume from based on what's in state
+            if state.commit_sha and state.files_committed:
+                # Code completed — resume from QA
+                state.status = PipelineStatus.QA
+                state.current_phase = "qa"
+                state.errors = []  # Clear previous errors
+            elif state.plan:
+                # Plan completed but no code — resume from CODE
+                state.status = PipelineStatus.CODING
+                state.current_phase = "coding"
+                state.errors = []
+            else:
+                # No plan — start fresh
+                state.status = PipelineStatus.PENDING
+                state.current_phase = ""
+                state.errors = []
+            self.state_store.save(state)
 
         return self._run_pipeline(
             state,

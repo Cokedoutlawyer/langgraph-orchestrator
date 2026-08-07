@@ -191,7 +191,16 @@ class GitOps:
         elapsed = 0.0
 
         while elapsed < max_wait:
-            status = self.client.get_combined_check_status(owner, repo, pr.head_sha)
+            try:
+                status = self.client.get_combined_check_status(owner, repo, pr.head_sha)
+            except Exception as e:
+                # If we can't read checks (e.g., PAT lacks checks:read scope),
+                # return without merging but with a clear message
+                logger.warning("Cannot read CI checks: %s — skipping merge-on-green", e)
+                return MergeResult(
+                    merged=False,
+                    message=f"PR created but cannot read CI checks ({e}). Manual merge required.",
+                )
 
             if status["total"] == 0:
                 logger.debug("No checks found yet (elapsed %.0fs)...", elapsed)
