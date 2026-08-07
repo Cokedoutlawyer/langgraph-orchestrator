@@ -30,6 +30,7 @@ from .planner import Planner
 from .qa import QAChecker
 from .shipper import Shipper
 from .web_fetcher import WebFetcher
+from .oxylabs_client import OxylabsClient, OxylabsError
 from .state import (
     BuildPlan,
     PipelineState,
@@ -78,7 +79,17 @@ class Orchestrator:
         self.github = github or GitHubClient(self.config)
         self.llm = llm or LLMClient()
         self.git_ops = git_ops or GitOps(self.github, self.config)
-        self.web_fetcher = web_fetcher or WebFetcher()
+
+        # Auto-detect Oxylabs from env — enables stealthy scraping
+        import os as _os
+        _oxylabs = None
+        if _os.environ.get("OXYLABS_AI_STUDIO_API_KEY"):
+            try:
+                _oxylabs = OxylabsClient()
+            except OxylabsError:
+                pass
+
+        self.web_fetcher = web_fetcher or WebFetcher(oxylabs_client=_oxylabs)
         self.planner = planner or Planner(self.llm, self.github, self.web_fetcher)
         self.coder = coder or Coder(self.llm, self.github, self.git_ops)
         self.qa_checker = qa_checker or QAChecker(workspace=workspace)

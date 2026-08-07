@@ -25,6 +25,7 @@ from .shipper import Shipper
 from .notify import Notifier
 from .llm import LLMClient
 from .web_fetcher import WebFetcher
+from .oxylabs_client import OxylabsClient, OxylabsError
 
 __version__ = "1.0.0"
 
@@ -44,4 +45,6 @@ __all__ = [
     "Notifier",
     "LLMClient",
     "WebFetcher",
+    "OxylabsClient",
+    "OxylabsError",
 ]

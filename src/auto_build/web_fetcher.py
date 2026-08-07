@@ -19,6 +19,8 @@ from typing import Any
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
+from .oxylabs_client import OxylabsClient, OxylabsError
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,10 +43,12 @@ class WebFetcher:
         search_api_key: str | None = None,
         search_base_url: str = "https://www.googleapis.com/customsearch/v1",
         timeout: float = 30.0,
+        oxylabs_client: OxylabsClient | None = None,
     ):
         self.search_api_key = search_api_key
         self.search_base_url = search_base_url
         self.timeout = timeout
+        self._oxylabs = oxylabs_client
         self._client: httpx.Client | None = None
 
     @property
@@ -221,9 +225,8 @@ class WebFetcher:
     def research(self, query: str, max_results: int = 3, max_chars_per_page: int = 3000) -> str:
         """Search the web and fetch content from top results.
 
-        This is the primary method for the planner/coder to use when
-        they need additional context. It searches, fetches the top
-        results, and returns a combined text block.
+        Uses Oxylabs AI Studio if configured (stealthy, AI-powered extraction),
+        falls back to DuckDuckGo + httpx if not.
 
         Args:
             query: Search query.
@@ -232,6 +235,16 @@ class WebFetcher:
         Returns:
             Combined research text, formatted with source URLs.
         """
+        # Prefer Oxylabs if available
+        if self._oxylabs is not None:
+            try:
+                result = self._oxylabs.research(query, max_results=max_results, max_chars_per_page=max_chars_per_page)
+                if result:
+                    return result
+            except Exception as e:
+                logger.warning("WebFetcher: Oxylabs research failed, falling back to DuckDuckGo: %s", e)
+
+        # Fallback: DuckDuckGo search + httpx fetch
         results = self.search(query, max_results=max_results)
         if not results:
             return "(no web results found)"
