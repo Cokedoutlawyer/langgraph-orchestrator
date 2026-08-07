@@ -36,3 +36,7 @@ packages = ["src/langgraph_orchestrator", "src/hermes_github", "src/auto_build"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::pytest.PytestConfigWarning",
+]
