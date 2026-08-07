@@ -1,0 +1,143 @@
+name: Auto-Build Pipeline
+
+# Multi-agent auto-build workflow: PLAN → CODE → QA → SHIP
+#
+# Triggers when:
+#   - An issue is labeled with "auto-build" (or "auto-build-request")
+#   - A PR comment contains "/build" from a trusted actor
+#   - Manual workflow_dispatch with issue number or requirements text
+#
+# The pipeline:
+#   1. PLAN: Reads the issue, analyzes repo structure, produces a build plan
+#   2. CODE: Generates code for each task in the plan, commits to a feature branch
+#   3. QA: Runs syntax checks, security scan, lint, type-check, tests
+#   4. SHIP: Creates a PR, waits for CI, auto-merges on green
+#
+# All progress is reported as comments on the triggering issue.
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to build from (leave empty to use requirements)"
+        required: false
+        type: string
+      requirements:
+        description: "Free-text requirements (if no issue number)"
+        required: false
+        type: string
+      repo:
+        description: "Target repo (default: langgraph-orchestrator)"
+        required: false
+        type: string
+      wait_for_ci:
+        description: "Wait for CI and auto-merge"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  statuses: read
+
+concurrency:
+  group: auto-build-${{ github.event.issue.number || github.event.inputs.issue_number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: PLAN → CODE → QA → SHIP
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Only run for trusted actors
+    if: |
+      github.actor == 'Nietzsche-Ubermensch' ||
+      github.event.label.name == 'auto-build' ||
+      github.event.label.name == 'auto-build-request' ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/build') && github.actor == 'Nietzsche-Ubermensch') ||
+      github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpx pydantic pydantic-settings tenacity structlog
+          pip install -e ".[dev]" 2>/dev/null || pip install httpx pydantic tenacity
+
+      - name: Set environment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "GITHUB_TOKEN=$GITHUB_TOKEN" >> $GITHUB_ENV
+          echo "LLM_API_KEY=${{ secrets.OPENAI_API_KEY || secrets.OPENROUTER_API_KEY }}" >> $GITHUB_ENV
+          echo "LLM_MODEL=${{ secrets.LLM_MODEL || 'gpt-4o' }}" >> $GITHUB_ENV
+          echo "LLM_BASE_URL=${{ secrets.LLM_BASE_URL || 'https://api.openai.com/v1' }}" >> $GITHUB_ENV
+
+      - name: Resolve build target
+        id: target
+        shell: bash
+        run: |
+          # Determine repo, issue number, and requirements from the trigger
+          REPO="${{ github.event.inputs.repo || 'langgraph-orchestrator' }}"
+          ISSUE_NUMBER="${{ github.event.inputs.issue_number || '' }}"
+          REQUIREMENTS="${{ github.event.inputs.requirements || '' }}"
+
+          # If triggered by issue label
+          if [ -z "$ISSUE_NUMBER" ] && [ "${{ github.event_name }}" = "issues" ]; then
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+          fi
+
+          # If triggered by issue comment with /build
+          if [ -z "$ISSUE_NUMBER" ] && [ "${{ github.event_name }}" = "issue_comment" ]; then
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+          fi
+
+          echo "repo=$REPO" >> $GITHUB_OUTPUT
+          echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          echo "requirements=$REQUIREMENTS" >> $GITHUB_OUTPUT
+
+      - name: Run auto-build pipeline (from issue)
+        if: steps.target.outputs.issue_number != ''
+        run: |
+          python scripts/run_pipeline.py \
+            --owner "${{ github.repository_owner }}" \
+            --repo "${{ steps.target.outputs.repo }}" \
+            --issue-number "${{ steps.target.outputs.issue_number }}" \
+            ${{ steps.target.outputs.wait_for_ci == 'false' && '--no-wait-for-ci' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LLM_API_KEY: ${{ secrets.OPENAI_API_KEY || secrets.OPENROUTER_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL || 'gpt-4o' }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL || 'https://api.openai.com/v1' }}
+
+      - name: Run auto-build pipeline (from requirements)
+        if: steps.target.outputs.issue_number == '' && steps.target.outputs.requirements != ''
+        run: |
+          python scripts/run_pipeline.py \
+            --owner "${{ github.repository_owner }}" \
+            --repo "${{ steps.target.outputs.repo }}" \
+            --requirements "${{ steps.target.outputs.requirements }}" \
+            --title "Manual build request"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LLM_API_KEY: ${{ secrets.OPENAI_API_KEY || secrets.OPENROUTER_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL || 'gpt-4o' }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL || 'https://api.openai.com/v1' }}
