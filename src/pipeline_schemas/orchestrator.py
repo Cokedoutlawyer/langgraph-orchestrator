@@ -154,7 +154,16 @@ def _route_request(state: PipelineGraphState) -> dict:
         research_needed=len(topics) > 0,
         research_topics=topics,
         model_phase=ModelPhase.PLAN,
-        system_prompt="You are a senior software architect planning a code change.",
+        system_prompt=(
+            "You are a senior software architect planning a code change for a GitHub repository.\n"
+            "You MUST respond with a JSON object containing EXACTLY these fields:\n"
+            '{"summary": "one paragraph", "branch_name": "feature/short-slug", '
+            '"commit_message": "conventional commit message", "pr_title": "max 72 chars", '
+            '"pr_body": "markdown body", "tasks": [{"description": "what to do", '
+            '"file_path": "src/path/to/file.py", "action": "create or modify"}]}\n'
+            "The tasks array MUST contain at least 1 entry. Each file_path MUST be a valid "
+            "relative path within the repository. Do NOT include any other top-level keys."
+        ),
         user_prompt=_build_plan_prompt(req),
         temperature=0.2,
         max_tokens=4096,
