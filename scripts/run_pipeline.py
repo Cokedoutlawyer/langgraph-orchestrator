@@ -157,6 +157,54 @@ def cmd_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_orchestrate(args: argparse.Namespace) -> int:
+    """Run the schema-driven orchestrator with real providers."""
+    import uuid
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+    from pipeline_schemas.production import run_production_pipeline
+    from pipeline_schemas import PipelineStatus
+
+    run_id = str(uuid.uuid4())
+    print(f"Waffen-SS Orchestration Run: {run_id}")
+    print(f"Profile: {args.profile}")
+    print(f"Repo: {args.owner}/{args.repo or 'langgraph-orchestrator'}")
+    print(f"Model: {args.model}")
+    print()
+
+    result = run_production_pipeline(
+        repo_owner=args.owner,
+        repo_name=args.repo or "langgraph-orchestrator",
+        trusted_actor="Nietzsche-Ubermensch",
+        requirements=args.requirements,
+        issue_number=args.issue_number,
+        wait_for_ci=not args.no_wait_for_ci,
+        model=args.model,
+    )
+
+    print("=" * 60)
+    print(f"Orchestration ID: {result.run_id}")
+    print(f"Status:           {result.status.value}")
+    print(f"Phase:            {result.current_phase}")
+    if result.plan:
+        print(f"Branch:           {result.plan.branch_name}")
+    if result.change_set:
+        print(f"Files:            {len(result.change_set.files)}")
+    if result.qa_report:
+        print(f"QA:               {'Passed' if result.qa_report.passed else 'Failed'}")
+    if result.ship_result and result.ship_result.pr_number:
+        print(f"PR:               #{result.ship_result.pr_number}")
+        print(f"PR URL:           {result.ship_result.pr_url}")
+        print(f"Merged:           {'Yes' if result.ship_result.merged else 'No'}")
+    if result.errors:
+        print(f"Errors:")
+        for e in result.errors:
+            print(f"  - {e}")
+    print("=" * 60)
+
+    return 0 if result.status == PipelineStatus.COMPLETED else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Auto-Build Pipeline: PLAN → CODE → QA → SHIP",
@@ -186,13 +234,24 @@ def main() -> int:
     show_parser = subparsers.add_parser("show", help="Show details of a pipeline run")
     show_parser.add_argument("run_id", help="Run ID to show")
 
+    # orchestrate command
+    orch_parser = subparsers.add_parser("orchestrate", help="Run the schema-driven orchestrator with real providers")
+    orch_parser.add_argument("profile", help="Orchestration profile name (e.g. Waffen-SS)")
+    orch_parser.add_argument("--owner", default="Nietzsche-Ubermensch", help="Repo owner")
+    orch_parser.add_argument("--repo", required=False, help="Repo name")
+    orch_parser.add_argument("--requirements", default="", help="Free-text requirements")
+    orch_parser.add_argument("--issue-number", type=int, help="GitHub issue number")
+    orch_parser.add_argument("--model", default="moonshotai/kimi-k3", help="Model for plan/code generation")
+    orch_parser.add_argument("--no-wait-for-ci", action="store_true", help="Don't wait for CI")
+    orch_parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")
+
     # Default to run if no command
     if len(sys.argv) == 1:
         parser.print_help()
         return 0
 
     # Also allow running without subcommand (for backward compat)
-    if sys.argv[1] not in ("run", "list", "show", "-h", "--help"):
+    if sys.argv[1] not in ("run", "list", "show", "orchestrate", "-h", "--help"):
         # Insert "run" as the default command
         sys.argv.insert(1, "run")
 
@@ -204,6 +263,8 @@ def main() -> int:
         return cmd_list(args)
     elif args.command == "show":
         return cmd_show(args)
+    elif args.command == "orchestrate":
+        return cmd_orchestrate(args)
     elif args.command == "run" or args.command is None:
         return cmd_run(args)
     else:
