@@ -405,17 +405,48 @@ def _plan_agent(state: PipelineGraphState) -> dict:
         except Exception:
             plan_data = {}
 
-    # Build the plan from LLM output
-    tasks = []
-    for t in plan_data.get("tasks", []):
-        tasks.append(BuildTask(
-            description=t.get("description", ""),
-            file_path=t.get("file_path", ""),
-            action=t.get("action", "create"),
-            content_preview=t.get("content_preview", ""),
-        ))
+    # Normalize LLM output — different models use different key names
+    summary = plan_data.get("summary") or plan_data.get("change_request") or plan_data.get("description") or "Auto-build change"
+    branch_name = plan_data.get("branch_name") or plan_data.get("branch") or "auto-build/untitled"
+    commit_message = plan_data.get("commit_message") or plan_data.get("commit") or f"feat: {summary[:50]}"
+    pr_title = plan_data.get("pr_title") or plan_data.get("title") or summary[:72]
+    pr_body = plan_data.get("pr_body") or plan_data.get("body") or f"## Summary\n{summary}"
 
-    branch_name = plan_data.get("branch_name", "auto-build/untitled")
+    # Normalize tasks — handle multiple LLM output formats
+    raw_tasks = (
+        plan_data.get("tasks")
+        or plan_data.get("files_to_create")
+        or plan_data.get("files_to_modify")
+        or plan_data.get("implementation_plan")
+        or plan_data.get("files")
+        or []
+    )
+    tasks = []
+    for t in raw_tasks:
+        if isinstance(t, str):
+            # Some models return a list of file paths as strings
+            tasks.append(BuildTask(
+                description=f"Create/modify {t}",
+                file_path=t,
+                action="create",
+            ))
+        elif isinstance(t, dict):
+            file_path = t.get("file_path") or t.get("path") or t.get("filename") or t.get("file") or ""
+            desc = t.get("description") or t.get("desc") or t.get("summary") or f"Modify {file_path}"
+            action = t.get("action") or ("modify" if "modify" in str(t).lower() else "create")
+            tasks.append(BuildTask(
+                description=desc,
+                file_path=file_path,
+                action=action,
+                content_preview=t.get("content_preview") or t.get("content") or "",
+            ))
+
+    # If no tasks found, try implementation_plan items
+    if not tasks and isinstance(plan_data.get("implementation_plan"), list):
+        for item in plan_data["implementation_plan"]:
+            if isinstance(item, dict) and ("file" in item or "path" in item or "file_path" in item):
+                fp = item.get("file") or item.get("path") or item.get("file_path") or ""
+                tasks.append(BuildTask(description=item.get("description", f"Modify {fp}"), file_path=fp, action="create"))
     if not branch_name.startswith("auto-build/"):
         branch_name = f"auto-build/{branch_name}"
 
@@ -423,12 +454,12 @@ def _plan_agent(state: PipelineGraphState) -> dict:
 
     plan = BuildPlan(
         run_id=run_id,
-        summary=plan_data.get("summary", ""),
+        summary=summary,
         repo=req.repo_name,
         branch_name=branch_name,
-        commit_message=plan_data.get("commit_message", "feat: auto-build change"),
-        pr_title=plan_data.get("pr_title", "Auto-build change"),
-        pr_body=plan_data.get("pr_body", "## Summary\nAuto-generated."),
+        commit_message=commit_message,
+        pr_title=pr_title,
+        pr_body=pr_body,
         tasks=tasks,
         research_context=research_ctx,
         estimated_files=len(tasks),
