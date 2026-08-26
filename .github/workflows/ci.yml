@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'feat/**']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpx pydantic pydantic-settings tenacity pyyaml structlog langgraph langgraph-checkpoint-sqlite pytest
+
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -v --tb=short
+
+      - name: Compile check
+        run: |
+          python -c "
+          import py_compile, os, sys
+          errors = []
+          for d in ['src/pipeline_schemas', 'src/auto_build', 'src/hermes_github']:
+              if not os.path.isdir(d):
+                  continue
+              for root, _, files in os.walk(d):
+                  for f in files:
+                      if f.endswith('.py'):
+                          p = os.path.join(root, f)
+                          try:
+                              py_compile.compile(p, doraise=True)
+                          except py_compile.PyCompileError as e:
+                              errors.append(str(e))
+          if errors:
+              for e in errors:
+                  print(f'FAIL: {e}')
+              sys.exit(1)
+          else:
+              print('All Python files compile clean')
+          "
