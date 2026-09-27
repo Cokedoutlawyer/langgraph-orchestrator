@@ -115,3 +115,7 @@ Credentials are loaded from `~/.hermes/.env`:
 4. **Graceful degradation**: Every node catches exceptions and records errors in state — the graph always completes and the summary node reports partial results.
 
 5. **Camofox session/tab flow**: v2.4.6 requires `POST /start` (session) → `POST /tabs` (open tab, returns targetId) → `GET /snapshot?targetId=` (accessibility tree).
+
+## Deterministic hybrid control plane
+
+The bounded Laya/Jev control plane, durable ledger, sixteen-check gate and recovery guide are in [docs/hybrid_control](docs/hybrid_control/README.md). Run `python scripts/hybrid_gate.py` to reproduce the acceptance suite.

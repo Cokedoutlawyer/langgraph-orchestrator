@@ -1,0 +1,4 @@
+{
+  "codex": {"version":"1.0.0", "enabled":true, "allowed_tools":["stage"], "forbidden_actions":["release", "approve", "change_policy"], "input_schema":{"type":"object","required":["value"],"properties":{"value":{"type":"string"}},"additionalProperties":false}, "output_schema":{"type":"object","required":["artifact", "evidence", "gaps"]}, "timeout_seconds":30,"max_attempts":3,"failure_classes":["SCHEMA_FAILURE","EXECUTION_FAILURE"]},
+  "jev": {"version":"1.0.0", "enabled":true, "allowed_tools":["stage"], "forbidden_actions":["release", "approve", "change_policy"], "input_schema":{"type":"object","required":["value"],"properties":{"value":{"type":"string"}},"additionalProperties":false}, "output_schema":{"type":"object","required":["artifact", "evidence", "gaps"]}, "timeout_seconds":30,"max_attempts":3,"failure_classes":["SCHEMA_FAILURE","EXECUTION_FAILURE"]}
+}

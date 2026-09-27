@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "contract_version": "1.0.0",
+  "policy_version": "2026-09-27.1",
+  "migration": 1,
+  "gate_command": "python scripts/hybrid_gate.py",
+  "files": {
+    "fixtures/hybrid_control/golden.json": "129365198113513636e965df6c8c052a6d60dd25d510fe51866a084679ff2016",
+    "schemas/hybrid_control/decision.schema.json": "9dcf2194bb2f30e4ba8cb570a8000bb021ebbb4fb208f0cd9788c66ea913afac",
+    "scripts/hybrid_ci_branch.py": "0d5c76ff7aba669078e8b9ec38e5670d784d74e1fa20c0edcfa7d2acdde30d33",
+    "scripts/hybrid_dashboard.py": "51cce7294f703a462245a006736156e12a093d0446504348d83864da1732f935",
+    "scripts/hybrid_demo.py": "f9255fedc21a2aded0517f081e5e7da9f68a9943fa84a3e35ac183a40a8ffb16",
+    "scripts/hybrid_gate.py": "75d8a65457a9a197420ecedc9dee7fd67335550c9f973f02ed46988d24af37be",
+    "src/hybrid_control/__init__.py": "f7ba482ff1b83f7c3286ffc63a5120923afccac40774daed57958f919dfe5993",
+    "src/hybrid_control/adapters.py": "bc99a0d361c851eb9c869e400501ff0c161475645b6c6aa06dac9006fd78ad1d",
+    "src/hybrid_control/core.py": "143ca52e1791b37b27b4f2937dc750b6d75ffa42821dfd648df943f8f9545acf",
+    "src/hybrid_control/data/001_init.sql": "17ab7ce64bd6d344638cbf5406ec7514057d53dbbc945ec66bca08e4b05886cc",
+    "src/hybrid_control/data/policy.json": "abb2c1aaf42c131c987ad9cb224de1c437b41cca62c84ae8c3b24e74801ee320",
+    "src/hybrid_control/data/workers.json": "ba34337a2ab210983149cb8429f3e4866540d4b6c0ce1a916c2720e81e2afafd",
+    "tests/hybrid_control/test_adapters.py": "2d9ba8949edcd8694f870be51f2360fe53921c1555796f9081dd30fe4d750af9",
+    "tests/hybrid_control/test_control.py": "5f1f265a6fa26cb0c305548d07f8cac047b5e10fef21792869bc6c9fffe435fc",
+    "tests/hybrid_control/test_gates.py": "93ac336376c614ca65c6e187e7ea06f514225f46b4e93903641abd96ebe7d75b"
+  }
+}

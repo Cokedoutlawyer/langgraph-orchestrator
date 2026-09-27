@@ -1,0 +1,25 @@
+name: Hybrid control gate
+on:
+  push:
+    branches: [main, 'feat/**', 'co-ci/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  deterministic-gate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python scripts/hybrid_gate.py --output gate-report.json
+      - run: python scripts/hybrid_demo.py --db /tmp/demo.db --release
+      - run: python scripts/hybrid_demo.py --db /tmp/demo.db --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-gate-${{ matrix.python }}
+          path: gate-report.json

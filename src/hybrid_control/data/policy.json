@@ -1,0 +1,15 @@
+{
+  "version": "2026-09-27.1",
+  "contract_version": "1.0.0",
+  "routing": {
+    "laya": {"confidence_min": 0.92, "policy_version": "2026-09-27.laya.1"},
+    "jev": {"confidence_min": 0.97, "policy_version": "2026-09-27.jev.1", "required_for": ["high_consequence", "high_cardinality", "novelty", "requires_escalation", "unsupported_result", "policy_override"]}
+  },
+  "allowed_classifications": ["public", "internal"],
+  "cloud_classifications": ["public"],
+  "reviewers": ["reviewer"],
+  "controllers": ["release-controller"],
+  "external_effects_enabled": false,
+  "fixture_effects_enabled": true,
+  "max_attempts": 3
+}
