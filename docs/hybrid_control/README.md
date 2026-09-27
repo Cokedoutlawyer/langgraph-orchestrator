@@ -116,6 +116,41 @@ https://github.com/NandhaKishorM/laya#self-hosting-http-server-jev-compatible
 | 11 | `hybrid-control.yml`, explicit CO-CI branch helper, rollback tests |
 | 12 | Schemas, migration, policy, fixtures, dashboard, recovery, manifest |
 
+## Coordinator integration
+
+Codex Coordinator owns task boundaries only. The runtime ledger remains the
+SQLite runs/events/staged/effects/receipts/settings database; Coordinator
+claims must never contain runtime receipts, provider responses, or transcripts.
+
+For starting, joining, claiming, completing or integrating work, read the
+installed Coordinator skill's `references/operations.md`, then
+`references/execution.md`, completely. Load messaging, installation, recovery,
+maintenance or doctor references only when that operation applies.
+
+1. Resolve the Git common repository and primary worktree. Read
+   `.codex/coordination/project.yaml` before any other board state.
+2. Respect `coordination_enabled: false`. An absent marker is not permission
+   to initialize a board; use the skill's explicit enablement conditions.
+3. Keep a coherent implementation in one task unless authorized parallel work
+   has two or three substantial verticals. All writers share the same checkout
+   and branch. Never invent a native thread UUID for a claim.
+4. When the board is enabled, use its bundled state helper to list active
+   claims and atomically claim the exact paths or exclusive action before work.
+   A designated Coordinator claims only the bounded `goal-coordination` action
+   unless it also edits source files.
+5. Update claims at scope, blocked/unblocked and completion boundaries. Do not
+   introduce polling, a heartbeat, a second task ledger, or automatic authority.
+6. Stage explicit reviewed paths, preserve other work and serialize commands
+   that write shared outputs. Path overlap alone is advisory; resolve actual
+   conflicting edits before writing.
+7. Release the current task's own claim at completion. Never infer that another
+   claim is stale from elapsed time or silence.
+
+Coordinator enablement does not change worker contracts, runtime ownership,
+approval identities or release permissions. The CO-CI branch helper is an
+explicit single-task setup command; do not invoke it while coordinated writers
+are active.
+
 ## Acceptance evidence
 
 `gate-report.json` records 16 executable gate outcomes and exact passing test
